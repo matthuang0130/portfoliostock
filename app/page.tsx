@@ -42,7 +42,7 @@ export default async function Home(props: { searchParams: any }) {
     ? await sql`SELECT EXTRACT(YEAR FROM trade_date)::int AS year, SUM(CASE WHEN action_type = 'CASH_DIVIDEND' THEN total_amount ELSE 0 END) AS yearly_dividend FROM transactions WHERE action_type = 'CASH_DIVIDEND' GROUP BY year ORDER BY year DESC`
     : await sql`SELECT EXTRACT(YEAR FROM trade_date)::int AS year, SUM(CASE WHEN action_type = 'CASH_DIVIDEND' THEN total_amount ELSE 0 END) AS yearly_dividend FROM transactions WHERE account_id = ${accId} AND action_type = 'CASH_DIVIDEND' GROUP BY year ORDER BY year DESC`;
 
-  let snapshots = [];
+  let snapshots: any[] = [];
   try {
     snapshots = await sql`SELECT record_date, total_value FROM asset_snapshots WHERE account_id = ${accId} ORDER BY record_date ASC`;
   } catch (e) {}
