@@ -51,9 +51,13 @@ export default async function Home(props: { searchParams: any }) {
     ? await sql`SELECT id, symbol, action_type, trade_date, shares, price, total_amount FROM transactions ORDER BY trade_date DESC, id DESC`
     : await sql`SELECT id, symbol, action_type, trade_date, shares, price, total_amount FROM transactions WHERE account_id = ${accId} ORDER BY trade_date DESC, id DESC`;
 
-  const formattedTransactions = rawTransactions.map(tx => ({
-    ...tx, trade_date: new Date(tx.trade_date).toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' }),
-    shares: Number(tx.shares), price: Number(tx.price), total_amount: Number(tx.total_amount)
+  const formattedTransactions = rawTransactions.map((tx: any) => ({
+    ...tx, 
+    symbol: String(tx.symbol || ''),
+    trade_date: new Date(tx.trade_date).toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' }),
+    shares: Number(tx.shares), 
+    price: Number(tx.price), 
+    total_amount: Number(tx.total_amount)
   }));
 
   const yearlyDividends = yearlyStatsRaw.map(row => ({ year: Number(row.year), dividend: Number(row.yearly_dividend) }));
