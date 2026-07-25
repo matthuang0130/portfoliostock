@@ -50,10 +50,10 @@ export default function DashboardCharts({
                 <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
                 <XAxis dataKey="year" stroke="#94a3b8" />
                 <YAxis stroke="#94a3b8" tickFormatter={(val) => `$${val/1000}k`} width={60} />
-                <Tooltip 
-                  contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', color: '#f8fafc' }}
-                  formatter={(val: number) => [`$${val.toLocaleString()}`, '配息總額']}
-                />
+             <Tooltip 
+  contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', color: '#f8fafc' }}
+  formatter={(val: any) => [`$${Number(val || 0).toLocaleString()}`, '配息總額']}
+/>
                 <Bar dataKey="dividend" fill="#38bdf8" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
@@ -86,9 +86,9 @@ export default function DashboardCharts({
                 <XAxis dataKey="date" stroke="#94a3b8" />
                 <YAxis stroke="#94a3b8" tickFormatter={(val) => `$${(val/10000).toFixed(0)}w`} width={60} domain={['auto', 'auto']} />
                 <Tooltip 
-                  contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', color: '#f8fafc' }}
-                  formatter={(val: number) => [`$${val.toLocaleString()}`, '總市值']}
-                />
+  contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', color: '#f8fafc' }}
+  formatter={(val: any) => [`$${Number(val || 0).toLocaleString()}`, '總市值']}
+/>
                 <Line type="monotone" dataKey="value" stroke="#34d399" strokeWidth={3} dot={{ r: 4, fill: '#059669' }} />
               </LineChart>
             </ResponsiveContainer>
