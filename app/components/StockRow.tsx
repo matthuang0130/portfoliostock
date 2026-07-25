@@ -101,8 +101,8 @@ export default function StockRow({ stock, transactions, stockName }: StockRowPro
                   <span>{tx.price > 0 ? `@ $${tx.price}` : '-'}</span>
                   <span className="font-semibold">${Number(tx.total_amount).toLocaleString()}</span>
                   
-                  {/* 單筆刪除按鈕 */}
-                  <form action={deleteTransaction} className="inline-block">
+                  {/* 單筆刪除按鈕 (🌟 將 action 包裝成 Promise<void> 避免 TypeScript Build Error) */}
+                  <form action={async (formData) => { await deleteTransaction(formData); }} className="inline-block">
                     <input type="hidden" name="id" value={tx.id} />
                     <button type="submit" className="text-[10px] text-red-400 hover:text-red-300 bg-red-950/40 px-1.5 py-0.5 rounded border border-red-900/40 ml-2">
                       刪除
