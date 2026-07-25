@@ -7,11 +7,9 @@ import AccountTabs from './components/AccountTabs';
 import StockRow from './components/StockRow'; 
 import { fetchCurrentPrice, getStockNames } from './lib/stockApi'; 
 
-// 🌟 關鍵修正 1：強制關閉頁面快取，保證每次點擊頁籤都能拉取最新資料！
 export const dynamic = 'force-dynamic';
 
-// 🌟 關鍵修正 2：相容最新版 Next.js，將 searchParams 視為非同步 Promise 讀取
-export default async function Home(props: { searchParams: any }) {
+export default async function Home(props: { searchParams: Promise<any> }) {
   const params = await props.searchParams;
   const currentAccount = params?.account || '1';
   const accId = currentAccount === 'all' ? 0 : Number(currentAccount);
@@ -19,8 +17,7 @@ export default async function Home(props: { searchParams: any }) {
   const sql = neon(process.env.DATABASE_URL!);
   const stockNameMap = await getStockNames();
 
-  // 動態 SQL 查詢 (總覽模式 vs 單一帳號)
-  const holdings = currentAccount === 'all'
+  const holdings: any[] = currentAccount === 'all'
     ? await sql`
         SELECT symbol,
           SUM(CASE WHEN action_type IN ('BUY', 'STOCK_DIVIDEND') THEN shares ELSE 0 END) - SUM(CASE WHEN action_type = 'SELL' THEN shares ELSE 0 END) AS total_shares,
@@ -60,18 +57,20 @@ export default async function Home(props: { searchParams: any }) {
     total_amount: Number(tx.total_amount)
   }));
 
-  const yearlyDividends = yearlyStatsRaw.map(row => ({ year: Number(row.year), dividend: Number(row.yearly_dividend) }));
+  const yearlyDividends = yearlyStatsRaw.map((row: any) => ({ year: Number(row.year), dividend: Number(row.yearly_dividend) }));
 
   let sumCost = 0; let sumMarketValue = 0;
   const holdingsWithPrices = await Promise.all(
-    holdings.map(async (stock) => {
-      const shares = Number(stock.total_shares); const cost = Number(stock.net_cost);
+    holdings.map(async (stock: any) => {
+      const symbol = String(stock.symbol || '');
+      const shares = Number(stock.total_shares || 0); 
+      const cost = Number(stock.net_cost || 0);
       const avgPrice = shares > 0 ? (cost / shares) : 0;
-      const currentPrice = await fetchCurrentPrice(stock.symbol, avgPrice);
+      const currentPrice = await fetchCurrentPrice(symbol, avgPrice);
       const marketValue = shares * currentPrice; 
-      const dividends = Number(stock.total_dividends);
+      const dividends = Number(stock.total_dividends || 0);
       sumCost += cost; sumMarketValue += marketValue;
-      return { ...stock, symbol: stock.symbol, currentPrice, marketValue, cost, dividends };
+      return { ...stock, symbol, currentPrice, marketValue, cost, dividends };
     })
   );
   holdingsWithPrices.sort((a, b) => b.marketValue - a.marketValue);
@@ -152,10 +151,10 @@ export default async function Home(props: { searchParams: any }) {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800">
-                  {holdingsWithPrices.map((stock, idx) => (
+                  {holdingsWithPrices.map((stock: any, idx: number) => (
                     <StockRow 
                       key={idx} stock={stock} 
-                      transactions={formattedTransactions.filter(tx => tx.symbol === stock.symbol)} 
+                      transactions={formattedTransactions.filter((tx: any) => tx.symbol === stock.symbol)} 
                       stockName={stockNameMap[stock.symbol]} 
                     />
                   ))}
