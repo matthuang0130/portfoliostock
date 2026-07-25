@@ -87,7 +87,8 @@ export default async function Home(props: { searchParams: Promise<any> }) {
 
       <div className="flex flex-col lg:flex-row gap-8 w-full">
         
-        <div className="w-full lg:w-1/3 flex flex-col gap-6">
+        {/* 左側操作區塊 */}
+        <div className="w-full lg:w-1/3 flex flex-col gap-4">
           {currentAccount === 'all' ? (
             <div className="bg-slate-900 p-8 rounded-xl shadow-lg border border-slate-800 text-center flex flex-col items-center justify-center h-full">
               <span className="text-5xl mb-4">🌐</span>
@@ -99,13 +100,29 @@ export default async function Home(props: { searchParams: Promise<any> }) {
             </div>
           ) : (
             <>
+              {/* 主要表單：手動新增 */}
               <TransactionForm accountId={accId} />
-              <ImportExcel accountId={accId} />
-              <ClearDataButton accountId={accId} />
+
+              {/* 🌟 摺疊工具區塊：匯入與清空 */}
+              <details className="group bg-slate-900 rounded-xl border border-slate-800 transition-all duration-200">
+                <summary className="p-4 font-semibold text-slate-300 cursor-pointer flex justify-between items-center select-none text-sm hover:text-slate-100">
+                  <span>📂 批次匯入與資料管理</span>
+                  <span className="text-slate-500 group-open:rotate-180 transition-transform text-xs">▼</span>
+                </summary>
+                <div className="p-4 pt-0 flex flex-col gap-4 border-t border-slate-800/50 mt-2">
+                  <div className="pt-2">
+                    <ImportExcel accountId={accId} />
+                  </div>
+                  <div className="border-t border-slate-800 pt-3">
+                    <ClearDataButton accountId={accId} />
+                  </div>
+                </div>
+              </details>
             </>
           )}
         </div>
 
+        {/* 右側資訊區塊 */}
         <div className="w-full lg:w-2/3 flex flex-col">
           <div className="bg-slate-900 p-6 rounded-xl shadow-lg border border-slate-800 mb-6 flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
             <div>
