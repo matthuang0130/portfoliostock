@@ -49,7 +49,21 @@ export default function DashboardCharts({
                 <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
                 <XAxis dataKey="year" stroke="#94a3b8" />
                 <YAxis stroke="#94a3b8" tickFormatter={(val) => `$${val/1000}k`} width={60} />
-                <Tooltip contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', color: '#f8fafc' }} />
+                
+                {/* 🌟 修正點：自訂深色提示框與消除白色大方框 cursor */}
+                <Tooltip 
+                  contentStyle={{ 
+                    backgroundColor: '#0f172a', 
+                    borderColor: '#334155', 
+                    color: '#f8fafc',
+                    borderRadius: '0.5rem',
+                    boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.5)'
+                  }} 
+                  cursor={{ fill: 'rgba(255, 255, 255, 0.05)' }}
+                  formatter={(value: any) => [`$${Number(value).toLocaleString()}`, '配息總額']}
+                  labelFormatter={(label) => `${label} 年`}
+                />
+                
                 <Bar dataKey="dividend" fill="#38bdf8" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
@@ -81,7 +95,20 @@ export default function DashboardCharts({
                 <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
                 <XAxis dataKey="date" stroke="#94a3b8" />
                 <YAxis stroke="#94a3b8" tickFormatter={(val) => `$${(val/10000).toFixed(0)}w`} width={60} domain={['auto', 'auto']} />
-                <Tooltip contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', color: '#f8fafc' }} />
+                
+                {/* 🌟 修正點：自訂深色提示框與暗色虛線游標 */}
+                <Tooltip 
+                  contentStyle={{ 
+                    backgroundColor: '#0f172a', 
+                    borderColor: '#334155', 
+                    color: '#f8fafc',
+                    borderRadius: '0.5rem',
+                    boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.5)'
+                  }} 
+                  cursor={{ stroke: '#475569', strokeWidth: 1, strokeDasharray: '4 4' }}
+                  formatter={(value: any) => [`$${Number(value).toLocaleString()}`, '總資產']}
+                />
+                
                 <Line type="monotone" dataKey="value" stroke="#34d399" strokeWidth={3} dot={{ r: 4, fill: '#059669' }} />
               </LineChart>
             </ResponsiveContainer>
