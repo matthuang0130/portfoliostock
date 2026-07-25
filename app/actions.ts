@@ -3,16 +3,14 @@
 import { neon } from '@neondatabase/serverless';
 import { revalidatePath } from 'next/cache';
 
-// 🌟 新增：自動確保帳號存在的輔助函式 (自動幫新帳號「開戶」)
+// 🌟 自動確保帳號存在的輔助函式
 async function ensureAccountExists(accountId: number) {
   if (accountId === 0) return; // 總覽模式不需要開戶
   const sql = neon(process.env.DATABASE_URL!);
   
   try {
-    // 告訴資料庫：請幫我建立這個帳號，如果已經存在就什麼都不做 (ON CONFLICT DO NOTHING)
     await sql`INSERT INTO accounts (id) VALUES (${accountId}) ON CONFLICT (id) DO NOTHING`;
   } catch (e) {
-    // 萬一 accounts 表格原本有規定要填名字，就加上預設名稱再試一次
     try {
       await sql`INSERT INTO accounts (id, name) VALUES (${accountId}, ${'帳號 ' + accountId}) ON CONFLICT (id) DO NOTHING`;
     } catch (err) {
@@ -24,16 +22,27 @@ async function ensureAccountExists(accountId: number) {
 // 1. 手動新增單筆交易
 export async function addTransaction(formData: FormData) {
   const account_id = Number(formData.get('account_id')) || 1;
-  await ensureAccountExists(account_id); // 🌟 寫入前先確認已開戶
+  await ensureAccountExists(account_id);
 
-  const symbol = formData.get('symbol')?.toString().toUpperCase() || '';
+  const symbol = formData.get('symbol')?.toString().toUpperCase().trim() || '';
   const action_type = formData.get('action_type')?.toString() || 'BUY';
   const trade_date = formData.get('trade_date')?.toString() || new Date().toISOString().split('T')[0];
   const shares = Number(formData.get('shares')) || 0;
   const price = Number(formData.get('price')) || 0;
-  const total_amount = shares * price;
 
-  if (!symbol || shares <= 0) return;
+  // 🌟 修正點 1：如果是現金股利，總金額直接等於填寫的 price
+  let total_amount = 0;
+  if (action_type === 'CASH_DIVIDEND') {
+    total_amount = price;
+  } else {
+    total_amount = shares * price;
+  }
+
+  // 🌟 修正點 2：基本驗證放寬。如果不是現金股利，才強制檢查 shares > 0
+  if (!symbol) return;
+  if (action_type !== 'CASH_DIVIDEND' && shares <= 0) return;
+  if (action_type === 'CASH_DIVIDEND' && total_amount <= 0) return;
+
   const sql = neon(process.env.DATABASE_URL!);
   await sql`
     INSERT INTO transactions (account_id, symbol, action_type, trade_date, shares, price, total_amount)
@@ -60,7 +69,7 @@ export async function clearAllTransactions(accountId: number) {
 
 // 4. 記錄資產快照
 export async function recordAssetSnapshot(accountId: number, totalValue: number, totalCost: number) {
-  if (accountId !== 0) await ensureAccountExists(accountId); // 🌟 寫入前先確認已開戶
+  if (accountId !== 0) await ensureAccountExists(accountId);
   
   const sql = neon(process.env.DATABASE_URL!);
   await sql`
@@ -80,7 +89,7 @@ export async function recordAssetSnapshot(accountId: number, totalValue: number,
 
 // 5. 批次匯入交易紀錄
 export async function importTransactions(accountId: number, records: any[]) {
-  await ensureAccountExists(accountId); // 🌟 匯入前先確認已開戶！這行能解決你的 500 報錯
+  await ensureAccountExists(accountId);
   
   const sql = neon(process.env.DATABASE_URL!);
   
