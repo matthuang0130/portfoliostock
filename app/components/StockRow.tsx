@@ -1,102 +1,115 @@
 'use client';
 
 import { useState } from 'react';
-import DeleteButton from './DeleteButton';
 import { deleteTransaction } from '../actions';
 
-export default function StockRow({ stock, transactions, stockName }: { stock: any, transactions: any[], stockName: string }) {
-  // 控制是否展開明細的狀態
-  const [isOpen, setIsOpen] = useState(false);
-
-  const shares = Number(stock.total_shares);
-  const cost = Number(stock.net_cost);
-  const dividends = Number(stock.total_dividends);
-  const currentPrice = stock.currentPrice;
-  
-  const avgPrice = shares > 0 ? (cost / shares).toFixed(2) : '0.00';
-  const marketValue = shares * currentPrice;
-  const pnl = marketValue - cost + dividends;
-  const pnlPercent = cost > 0 ? ((pnl / cost) * 100).toFixed(2) : '0.00';
-  
-  // 深色模式專用的紅綠漲跌色
-  const pnlColorClass = pnl > 0 ? 'text-red-400' : pnl < 0 ? 'text-green-400' : 'text-slate-300';
-  const sign = pnl > 0 ? '+' : '';
-
-  const actionNameMap: Record<string, string> = {
-    'BUY': '買進',
-    'SELL': '賣出',
-    'CASH_DIVIDEND': '現金股利',
-    'STOCK_DIVIDEND': '股票股利',
+interface StockRowProps {
+  stock: {
+    symbol: string;
+    symbol_name?: string; // 🌟 資料庫存進來的商品名稱
+    total_shares: number;
+    cost: number;
+    currentPrice: number;
+    marketValue: number;
+    dividends: number;
   };
+  transactions: any[];
+  stockName?: string; // 🌟 外部備用傳入的名稱
+}
+
+export default function StockRow({ stock, transactions, stockName }: StockRowProps) {
+  const [expanded, setExpanded] = useState(false);
+
+  // 🌟 強制優先讀取 Excel 存進資料庫的名稱，若無則降級讀取備用名稱
+  const displayName = stock.symbol_name || stockName || '';
+
+  const shares = Number(stock.total_shares || 0);
+  const cost = Number(stock.cost || 0);
+  const avgCost = shares > 0 ? cost / shares : 0;
+  const price = Number(stock.currentPrice || 0);
+  const marketValue = Number(stock.marketValue || shares * price);
+  const dividends = Number(stock.dividends || 0);
+
+  // 未實現損益 (不含息)
+  const pnlNoDiv = marketValue - cost;
+  // 未實現總報酬 (含息)
+  const pnlTotal = pnlNoDiv + dividends;
+
+  const pnlNoDivColor = pnlNoDiv > 0 ? 'text-red-400' : pnlNoDiv < 0 ? 'text-green-400' : 'text-slate-300';
+  const pnlTotalColor = pnlTotal > 0 ? 'text-red-400' : pnlTotal < 0 ? 'text-green-400' : 'text-slate-300';
 
   return (
     <>
-      {/* 主列：顯示庫存總計 (深色模式樣式) */}
       <tr 
-        onClick={() => setIsOpen(!isOpen)} 
-        className="border-b border-slate-700 hover:bg-slate-800 transition text-sm cursor-pointer"
-        title="點擊展開/收合交易明細"
+        onClick={() => setExpanded(!expanded)}
+        className="hover:bg-slate-800/50 cursor-pointer transition text-sm text-slate-200 border-b border-slate-800/60"
       >
-        <td className="py-4 px-2 font-bold flex items-center">
-          <span className="mr-2 text-slate-500 text-xs">{isOpen ? '▼' : '▶'}</span>
-          <span className="text-slate-200">{stock.symbol}</span>
-          {stockName && (
-            <span className="ml-2 text-xs font-semibold text-blue-200 bg-blue-900/50 border border-blue-700/50 px-2 py-1 rounded-md shadow-sm">
-              {stockName}
-            </span>
-          )}
+        {/* 代號與股票名稱 */}
+        <td className="py-3 px-2 font-bold">
+          <div className="flex items-center gap-1.5">
+            <span className="text-slate-500 text-xs">{expanded ? '▲' : '▼'}</span>
+            <span className="text-slate-100 font-extrabold">{stock.symbol}</span>
+            {displayName && (
+              <span className="text-xs text-sky-400 font-semibold bg-sky-950/60 px-1.5 py-0.5 rounded border border-sky-800/50">
+                {displayName}
+              </span>
+            )}
+          </div>
         </td>
-        <td className="py-4 px-2 text-right text-slate-200">{shares.toLocaleString()}</td>
-        <td className="py-4 px-2 text-right text-slate-400">${avgPrice}</td>
-        <td className="py-4 px-2 text-right font-medium text-blue-400">${currentPrice.toFixed(2)}</td>
-        <td className="py-4 px-2 text-right text-slate-200">${marketValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}</td>
-        <td className="py-4 px-2 text-right text-slate-400">${dividends.toLocaleString()}</td>
-        <td className={`py-4 px-2 text-right font-bold ${pnlColorClass}`}>
-          {sign}${pnl.toLocaleString(undefined, { maximumFractionDigits: 0 })} <br/>
-          <span className="text-xs">({sign}{pnlPercent}%)</span>
+
+        {/* 庫存股數 */}
+        <td className="py-3 px-2 text-right">{shares.toLocaleString()}</td>
+
+        {/* 平均成本 */}
+        <td className="py-3 px-2 text-right">${avgCost.toFixed(2)}</td>
+
+        {/* 當前市價 */}
+        <td className="py-3 px-2 text-right">${price.toFixed(2)}</td>
+
+        {/* 總市值 */}
+        <td className="py-3 px-2 text-right font-semibold">${Math.round(marketValue).toLocaleString()}</td>
+
+        {/* 累積配息 */}
+        <td className="py-3 px-2 text-right text-amber-400 font-medium">
+          {dividends > 0 ? `$${Math.round(dividends).toLocaleString()}` : '-'}
+        </td>
+
+        {/* 未實現損益 (不含息) */}
+        <td className={`py-3 px-2 text-right font-bold ${pnlNoDivColor}`}>
+          {pnlNoDiv > 0 ? '+' : ''}${Math.round(pnlNoDiv).toLocaleString()}
+        </td>
+
+        {/* 含息總報酬 */}
+        <td className={`py-3 px-2 text-right font-bold ${pnlTotalColor}`}>
+          {pnlTotal > 0 ? '+' : ''}${Math.round(pnlTotal).toLocaleString()}
         </td>
       </tr>
 
-      {/* 展開的明細列 (深色模式樣式) */}
-      {isOpen && (
-        <tr className="bg-slate-900/50 border-b-2 border-slate-700">
-          <td colSpan={7} className="p-4">
-            <div className="bg-slate-800 border border-slate-700 rounded-lg p-4 shadow-inner">
-              <h4 className="text-sm font-bold text-slate-300 mb-3">【{stock.symbol}】 歷史交易明細</h4>
-              {transactions.length === 0 ? (
-                <p className="text-sm text-slate-500">尚無明細</p>
-              ) : (
-                <table className="w-full text-left text-sm border-collapse">
-                  <thead>
-                    <tr className="border-b border-slate-600 text-slate-400">
-                      <th className="py-2 px-2">日期</th>
-                      <th className="py-2 px-2">動作</th>
-                      <th className="py-2 px-2 text-right">數量</th>
-                      <th className="py-2 px-2 text-right">單價</th>
-                      <th className="py-2 px-2 text-right">總金額</th>
-                      <th className="py-2 px-2 text-center">操作</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {transactions.map((tx: any) => (
-                      <tr key={tx.id} className="border-b border-slate-700 hover:bg-slate-700/50">
-                        <td className="py-2 px-2 text-slate-400">{tx.trade_date}</td>
-                        <td className="py-2 px-2 text-slate-400">{actionNameMap[tx.action_type] || tx.action_type}</td>
-                        <td className="py-2 px-2 text-right text-slate-300">{tx.shares.toLocaleString()}</td>
-                        <td className="py-2 px-2 text-right text-slate-400">${tx.price.toFixed(2)}</td>
-                        <td className="py-2 px-2 text-right text-slate-300">${tx.total_amount.toLocaleString()}</td>
-                        <td className="py-2 px-2 text-center">
-                          {/* 刪除按鈕 */}
-                          <form action={deleteTransaction}>
-                            <input type="hidden" name="id" value={tx.id} />
-                            <DeleteButton symbol={tx.symbol} />
-                          </form>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
+      {/* 展開明細交易紀錄 */}
+      {expanded && transactions && transactions.length > 0 && (
+        <tr>
+          <td colSpan={8} className="bg-slate-950/80 p-4 border-b border-slate-800">
+            <div className="text-xs font-bold text-slate-400 mb-2">📜 歷史交易明細 ({stock.symbol} - {displayName})：</div>
+            <div className="flex flex-col gap-1 text-xs">
+              {transactions.map((tx: any, idx: number) => (
+                <div key={idx} className="flex justify-between items-center text-slate-300 py-1.5 border-b border-slate-900">
+                  <span>{tx.trade_date}</span>
+                  <span className={`font-bold ${tx.action_type === 'BUY' ? 'text-sky-400' : tx.action_type === 'SELL' ? 'text-emerald-400' : 'text-amber-400'}`}>
+                    {tx.action_type === 'BUY' ? '買進' : tx.action_type === 'SELL' ? '賣出' : '現金配息'}
+                  </span>
+                  <span>{tx.shares > 0 ? `${tx.shares} 股` : '-'}</span>
+                  <span>{tx.price > 0 ? `@ $${tx.price}` : '-'}</span>
+                  <span className="font-semibold">${Number(tx.total_amount).toLocaleString()}</span>
+                  
+                  {/* 單筆刪除按鈕 */}
+                  <form action={deleteTransaction} className="inline-block">
+                    <input type="hidden" name="id" value={tx.id} />
+                    <button type="submit" className="text-[10px] text-red-400 hover:text-red-300 bg-red-950/40 px-1.5 py-0.5 rounded border border-red-900/40 ml-2">
+                      刪除
+                    </button>
+                  </form>
+                </div>
+              ))}
             </div>
           </td>
         </tr>
