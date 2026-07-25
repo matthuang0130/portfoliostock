@@ -71,7 +71,7 @@ export default async function Home(props: { searchParams: any }) {
       const marketValue = shares * currentPrice; 
       const dividends = Number(stock.total_dividends);
       sumCost += cost; sumMarketValue += marketValue;
-      return { ...stock, currentPrice, marketValue, cost, dividends };
+      return { ...stock, symbol: stock.symbol, currentPrice, marketValue, cost, dividends };
     })
   );
   holdingsWithPrices.sort((a, b) => b.marketValue - a.marketValue);
