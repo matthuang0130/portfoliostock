@@ -6,7 +6,7 @@ import { deleteTransaction } from '../actions';
 interface StockRowProps {
   stock: {
     symbol: string;
-    symbol_name?: string; // 🌟 資料庫存進來的商品名稱
+    symbol_name?: string;
     total_shares: number;
     cost: number;
     currentPrice: number;
@@ -14,15 +14,13 @@ interface StockRowProps {
     dividends: number;
   };
   transactions: any[];
-  stockName?: string; // 🌟 外部備用傳入的名稱
+  stockName?: string;
 }
 
-export default function StockRow({ stock, transactions, stockName }: StockRowProps) {
+export default function StockRow({ stock, transactions = [], stockName }: StockRowProps) {
   const [expanded, setExpanded] = useState(false);
 
-  // 🌟 強制優先讀取 Excel 存進資料庫的名稱，若無則降級讀取備用名稱
   const displayName = stock.symbol_name || stockName || '';
-
   const shares = Number(stock.total_shares || 0);
   const cost = Number(stock.cost || 0);
   const avgCost = shares > 0 ? cost / shares : 0;
@@ -37,6 +35,50 @@ export default function StockRow({ stock, transactions, stockName }: StockRowPro
 
   const pnlNoDivColor = pnlNoDiv > 0 ? 'text-red-400' : pnlNoDiv < 0 ? 'text-green-400' : 'text-slate-300';
   const pnlTotalColor = pnlTotal > 0 ? 'text-red-400' : pnlTotal < 0 ? 'text-green-400' : 'text-slate-300';
+
+  // 🌟 精準過濾與合併：只處理有買進或有配息的紀錄，徹底消滅空的「-」列
+  const combinedRows = (() => {
+    const rowMap: { [key: string]: any } = {};
+
+    transactions.forEach((tx) => {
+      const isBuy = tx.action_type === 'BUY' || tx.action_type === 'STOCK_DIVIDEND';
+      const isDividend = tx.action_type === 'CASH_DIVIDEND';
+
+      // 只有當是「買進」或「現金配息」時才進行處理
+      if (!isBuy && !isDividend) return;
+
+      const date = tx.trade_date;
+
+      if (!rowMap[date]) {
+        rowMap[date] = {
+          id: tx.id,
+          ids: [tx.id],
+          date: date,
+          shares: 0,
+          price: 0,
+          buyAmount: 0,
+          dividendAmount: 0,
+          hasBuy: false,
+        };
+      } else {
+        rowMap[date].ids.push(tx.id);
+      }
+
+      if (isBuy) {
+        rowMap[date].shares += Number(tx.shares || 0);
+        rowMap[date].price = Number(tx.price || 0);
+        rowMap[date].buyAmount += Number(tx.total_amount || 0);
+        rowMap[date].hasBuy = true;
+      } else if (isDividend) {
+        rowMap[date].dividendAmount += Number(tx.total_amount || 0);
+      }
+    });
+
+    // 徹底排除完全沒有買進金額也沒有配息金額的空白列
+    return Object.values(rowMap)
+      .filter((row: any) => row.buyAmount > 0 || row.dividendAmount > 0)
+      .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  })();
 
   return (
     <>
@@ -58,7 +100,7 @@ export default function StockRow({ stock, transactions, stockName }: StockRowPro
         </td>
 
         {/* 庫存股數 */}
-        <td className="py-3 px-2 text-right">{shares.toLocaleString()}</td>
+        <td className="py-3 px-2 text-right font-medium">{shares.toLocaleString()} 股</td>
 
         {/* 平均成本 */}
         <td className="py-3 px-2 text-right">${avgCost.toFixed(2)}</td>
@@ -70,7 +112,7 @@ export default function StockRow({ stock, transactions, stockName }: StockRowPro
         <td className="py-3 px-2 text-right font-semibold">${Math.round(marketValue).toLocaleString()}</td>
 
         {/* 累積配息 */}
-        <td className="py-3 px-2 text-right text-amber-400 font-medium">
+        <td className="py-3 px-2 text-right text-amber-400 font-bold">
           {dividends > 0 ? `$${Math.round(dividends).toLocaleString()}` : '-'}
         </td>
 
@@ -85,31 +127,83 @@ export default function StockRow({ stock, transactions, stockName }: StockRowPro
         </td>
       </tr>
 
-      {/* 展開明細交易紀錄 */}
-      {expanded && transactions && transactions.length > 0 && (
+      {/* 🌟 點開後：絕無空白列！清晰顯示買進與同日配息 */}
+      {expanded && (
         <tr>
-          <td colSpan={8} className="bg-slate-950/80 p-4 border-b border-slate-800">
-            <div className="text-xs font-bold text-slate-400 mb-2">📜 歷史交易明細 ({stock.symbol} - {displayName})：</div>
-            <div className="flex flex-col gap-1 text-xs">
-              {transactions.map((tx: any, idx: number) => (
-                <div key={idx} className="flex justify-between items-center text-slate-300 py-1.5 border-b border-slate-900">
-                  <span>{tx.trade_date}</span>
-                  <span className={`font-bold ${tx.action_type === 'BUY' ? 'text-sky-400' : tx.action_type === 'SELL' ? 'text-emerald-400' : 'text-amber-400'}`}>
-                    {tx.action_type === 'BUY' ? '買進' : tx.action_type === 'SELL' ? '賣出' : '現金配息'}
-                  </span>
-                  <span>{tx.shares > 0 ? `${tx.shares} 股` : '-'}</span>
-                  <span>{tx.price > 0 ? `@ $${tx.price}` : '-'}</span>
-                  <span className="font-semibold">${Number(tx.total_amount).toLocaleString()}</span>
-                  
-                  {/* 單筆刪除按鈕 (🌟 將 action 包裝成 Promise<void> 避免 TypeScript Build Error) */}
-                  <form action={async (formData) => { await deleteTransaction(formData); }} className="inline-block">
-                    <input type="hidden" name="id" value={tx.id} />
-                    <button type="submit" className="text-[10px] text-red-400 hover:text-red-300 bg-red-950/40 px-1.5 py-0.5 rounded border border-red-900/40 ml-2">
-                      刪除
-                    </button>
-                  </form>
+          <td colSpan={8} className="bg-slate-950 p-4 border-b border-slate-800">
+            <div className="bg-slate-900/90 rounded-xl border border-slate-800 p-4 shadow-inner">
+              
+              {/* 頂部大字表頭 */}
+              <div className="grid grid-cols-12 text-sm font-extrabold text-slate-300 pb-3 border-b-2 border-slate-700 px-3 items-center">
+                <div className="col-span-3 text-left">📅 交易日期</div>
+                <div className="col-span-2 text-center">買進股數</div>
+                <div className="col-span-2 text-center">成交單價</div>
+                <div className="col-span-2 text-right text-sky-400">買進總價</div>
+                <div className="col-span-2 text-right text-amber-400">現金股利</div>
+                <div className="col-span-1 text-center">操作</div>
+              </div>
+
+              {/* 明細列表 */}
+              {combinedRows.length === 0 ? (
+                <div className="text-sm text-slate-500 py-4 text-center">無買進或配息紀錄</div>
+              ) : (
+                <div className="flex flex-col divide-y divide-slate-800/60 max-h-[280px] overflow-y-auto">
+                  {combinedRows.map((row: any, idx: number) => (
+                    <div 
+                      key={idx} 
+                      className="grid grid-cols-12 text-sm py-3 px-3 items-center text-slate-200 hover:bg-slate-800/50 transition font-mono"
+                    >
+                      {/* 1. 交易日期 */}
+                      <div className="col-span-3 text-left font-bold text-slate-300">
+                        {row.date}
+                      </div>
+
+                      {/* 2. 股數 */}
+                      <div className="col-span-2 text-center font-semibold">
+                        {row.hasBuy ? `${row.shares.toLocaleString()} 股` : '-'}
+                      </div>
+
+                      {/* 3. 成交單價 */}
+                      <div className="col-span-2 text-center text-slate-400">
+                        {row.hasBuy ? `$${row.price.toFixed(2)}` : '-'}
+                      </div>
+
+                      {/* 4. 買進總價 */}
+                      <div className="col-span-2 text-right font-bold text-sky-300 text-base">
+                        {row.buyAmount > 0 ? `$${row.buyAmount.toLocaleString()}` : '-'}
+                      </div>
+
+                      {/* 5. 現金股利 */}
+                      <div className="col-span-2 text-right font-bold text-amber-400 text-base">
+                        {row.dividendAmount > 0 ? `+$${row.dividendAmount.toLocaleString()}` : '-'}
+                      </div>
+
+                      {/* 6. 刪除按鈕 */}
+                      <div className="col-span-1 text-center font-sans">
+                        <form 
+                          action={async () => {
+                            for (const id of row.ids) {
+                              const formData = new FormData();
+                              formData.append('id', String(id));
+                              await deleteTransaction(formData);
+                            }
+                          }} 
+                          className="inline-block"
+                        >
+                          <button 
+                            type="submit" 
+                            className="text-xs text-red-400 hover:text-white hover:bg-red-600 bg-red-950/60 px-2.5 py-1 rounded border border-red-800/60 transition"
+                          >
+                            刪除
+                          </button>
+                        </form>
+                      </div>
+
+                    </div>
+                  ))}
                 </div>
-              ))}
+              )}
+
             </div>
           </td>
         </tr>

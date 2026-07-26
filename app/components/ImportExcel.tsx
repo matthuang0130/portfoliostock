@@ -61,12 +61,12 @@ export default function ImportExcel({ accountId }: { accountId: number }) {
         const typeRaw = String(row['種類'] || row['動作'] || row['買賣別'] || row['交易類別'] || row['action_type'] || '').trim();
 
         if (importMode === 'INVENTORY') {
-          // ---------------- 📊 模式 A：純匯入庫存 ----------------
+          // ---------------- 📊 模式 A：純匯入庫存 (完全排除配息) ----------------
           if (sharesRaw > 0) {
             parsedTransactions.push({
               account_id: accountId,
               symbol: symbolRaw,
-              symbol_name: symbolNameRaw, // 🌟 抓取 Excel 名稱
+              symbol_name: symbolNameRaw,
               action_type: 'BUY',
               trade_date: formattedDate,
               shares: sharesRaw,
@@ -76,24 +76,7 @@ export default function ImportExcel({ accountId }: { accountId: number }) {
               record_source: 'INVENTORY'
             });
           }
-
-          const divVal = row['配息總額'] || row['累積配息'] || row['配息'] || row['現金股利'];
-          const dividendAmountRaw = (divVal !== '' && divVal !== '-' && !isNaN(Number(divVal))) ? Number(divVal) : 0;
-
-          if (dividendAmountRaw > 0) {
-            parsedTransactions.push({
-              account_id: accountId,
-              symbol: symbolRaw,
-              symbol_name: symbolNameRaw,
-              action_type: 'CASH_DIVIDEND',
-              trade_date: formattedDate,
-              shares: 0,
-              price: 0,
-              total_amount: dividendAmountRaw,
-              realized_pnl: null,
-              record_source: 'INVENTORY'
-            });
-          }
+          // 配息自動讀取 logic 已完全移除，確保庫存乾淨
         } else {
           // ---------------- 📜 模式 B：純匯入券商對帳單 (歷史損益) ----------------
           let actionType = 'BUY';

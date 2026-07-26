@@ -3,7 +3,7 @@
 import { neon } from '@neondatabase/serverless';
 import { revalidatePath } from 'next/cache';
 
-// 1. 新增單筆交易紀錄 (修復配息算成 0 的問題)
+// 1. 新增單筆交易紀錄 (修復配息算成 0，且將配息來源隔離)
 export async function addTransaction(formData: FormData) {
   try {
     const sql = neon(process.env.DATABASE_URL!);
@@ -20,7 +20,6 @@ export async function addTransaction(formData: FormData) {
     const shares = Number(formData.get('shares') || 0);
     const price = Number(formData.get('price') || 0);
     
-    // 🌟 關鍵修復：如果是現金配息，優先取 total_amount 或金額欄位，否則才用 shares * price
     let total_amount = Number(formData.get('total_amount') || 0);
     if (total_amount === 0 && (shares > 0 || price > 0)) {
       total_amount = shares * price;
@@ -30,9 +29,12 @@ export async function addTransaction(formData: FormData) {
       throw new Error('請填寫有效的標的代號、日期與金額！');
     }
 
+    // 🌟 配息標記為 DIVIDEND，庫存標記為 INVENTORY
+    const recordSource = action_type === 'CASH_DIVIDEND' ? 'DIVIDEND' : 'INVENTORY';
+
     await sql`
       INSERT INTO transactions (account_id, symbol, symbol_name, action_type, trade_date, shares, price, total_amount, record_source)
-      VALUES (${account_id}, ${symbol}, ${symbol_name}, ${action_type}, ${trade_date}, ${shares}, ${price}, ${total_amount}, 'INVENTORY')
+      VALUES (${account_id}, ${symbol}, ${symbol_name}, ${action_type}, ${trade_date}, ${shares}, ${price}, ${total_amount}, ${recordSource})
     `;
 
     revalidatePath('/');
@@ -103,7 +105,39 @@ export async function importTransactions(transactions: any[]) {
   }
 }
 
-// 4. 清空特定帳戶交易紀錄
+// 4-1. 📊 僅清空「庫存紀錄 (INVENTORY)」
+export async function clearInventoryData(accountId: number) {
+  try {
+    const sql = neon(process.env.DATABASE_URL!);
+    if (accountId === 0) {
+      await sql`DELETE FROM transactions WHERE record_source = 'INVENTORY' OR record_source IS NULL`;
+    } else {
+      await sql`DELETE FROM transactions WHERE account_id = ${accountId} AND (record_source = 'INVENTORY' OR record_source IS NULL)`;
+    }
+    revalidatePath('/');
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
+// 4-2. 📜 僅清空「歷史對帳單 (HISTORY_PNL)」
+export async function clearHistoryPnlData(accountId: number) {
+  try {
+    const sql = neon(process.env.DATABASE_URL!);
+    if (accountId === 0) {
+      await sql`DELETE FROM transactions WHERE record_source = 'HISTORY_PNL'`;
+    } else {
+      await sql`DELETE FROM transactions WHERE account_id = ${accountId} AND record_source = 'HISTORY_PNL'`;
+    }
+    revalidatePath('/');
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
+// 4-3. 🗑️ 完全清空特定帳戶所有資料 (含快照)
 export async function clearAccountData(accountId: number) {
   try {
     const sql = neon(process.env.DATABASE_URL!);
@@ -149,6 +183,76 @@ export async function recordAssetSnapshot(accountId: number, totalValue: number,
       VALUES (${accountId}, ${today}, ${totalValue}, ${totalCost})
       ON CONFLICT DO NOTHING
     `;
+
+    revalidatePath('/');
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
+// 6. 🎁 匯出配息紀錄備份 (精準版：過濾 0 元垃圾資料，並格式化日期)
+export async function exportDividends(accountId: number) {
+  try {
+    const sql = neon(process.env.DATABASE_URL!);
+    
+    // 🌟 只抓取 CASH_DIVIDEND 且 total_amount 嚴格大於 0 的真正配息
+    const rows = accountId === 0
+      ? await sql`
+          SELECT account_id, symbol, symbol_name, trade_date, total_amount 
+          FROM transactions 
+          WHERE action_type = 'CASH_DIVIDEND' 
+            AND total_amount > 0 
+          ORDER BY trade_date DESC
+        `
+      : await sql`
+          SELECT account_id, symbol, symbol_name, trade_date, total_amount 
+          FROM transactions 
+          WHERE account_id = ${accountId} 
+            AND action_type = 'CASH_DIVIDEND' 
+            AND total_amount > 0 
+          ORDER BY trade_date DESC
+        `;
+
+    // 格式化日期與金額，並將 record_source 統一定義為 DIVIDEND
+    const cleanData = rows.map((r: any) => ({
+      account_id: Number(r.account_id),
+      symbol: String(r.symbol),
+      symbol_name: r.symbol_name || null,
+      trade_date: new Date(r.trade_date).toISOString().split('T')[0],
+      total_amount: Number(r.total_amount),
+      record_source: 'DIVIDEND'
+    }));
+
+    return { success: true, data: cleanData };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
+// 7. 🎁 還原配息紀錄備份 (批次寫回)
+export async function restoreDividends(dividends: any[]) {
+  try {
+    if (!dividends || dividends.length === 0) return { success: true };
+
+    const sql = neon(process.env.DATABASE_URL!);
+
+    const queries = dividends.map((div) => sql`
+      INSERT INTO transactions (account_id, symbol, symbol_name, action_type, trade_date, shares, price, total_amount, record_source)
+      VALUES (
+        ${Number(div.account_id)}, 
+        ${String(div.symbol)}, 
+        ${div.symbol_name ? String(div.symbol_name) : null}, 
+        'CASH_DIVIDEND', 
+        ${div.trade_date}, 
+        0, 
+        0, 
+        ${Number(div.total_amount)}, 
+        ${div.record_source || 'DIVIDEND'}
+      )
+    `);
+
+    await sql.transaction(queries);
 
     revalidatePath('/');
     return { success: true };

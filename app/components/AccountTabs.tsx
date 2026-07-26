@@ -6,7 +6,7 @@ export default function AccountTabs({ currentAccount }: { currentAccount: string
     { id: '1', label: '帳號 1 (MATT積極)' },
     { id: '2', label: '帳號 2 (中秀 領息)' },
     { id: '3', label: '帳號 3 (吳悠悠 領息)' },
-    { id: '4', label: '帳號 4 (家人 B)' },
+    { id: '4', label: '帳號 4 (FENNY)' },
     { id: '5', label: '帳號 5 (備用)' },
     { id: 'all', label: '🌐 所有帳號合併總覽' }
   ];
