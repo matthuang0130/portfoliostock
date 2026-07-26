@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell,
-  PieChart, Pie, Rectangle
+  PieChart, Pie
 } from 'recharts';
 
 export default function DashboardCharts({
@@ -63,10 +63,6 @@ export default function DashboardCharts({
     return Object.values(map).sort((a, b) => b.total_amount - a.total_amount);
   })();
 
-  const renderCustomActiveBar = (props: any) => {
-    return <Rectangle {...props} stroke="none" strokeWidth={0} fillOpacity={0.85} />;
-  };
-
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 w-full mb-6 select-none">
       
@@ -99,7 +95,8 @@ export default function DashboardCharts({
           </div>
         </div>
 
-        <div className="flex-1 w-full min-h-0">
+        {/* 🌟 加上 [&_*]:outline-none 徹底消除點擊/聚焦藍白外框 */}
+        <div className="flex-1 w-full min-h-0 [&_*]:outline-none">
           {activeTab === 'REALIZED_PNL' ? (
             realizedPnlData.length === 0 ? (
               <div className="flex h-full flex-col items-center justify-center text-slate-500 text-xs gap-2">
@@ -110,13 +107,15 @@ export default function DashboardCharts({
                 <BarChart data={realizedPnlData} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
                   <XAxis dataKey="year" stroke="#64748b" fontSize={12} tickLine={false} />
                   <YAxis stroke="#64748b" fontSize={12} tickLine={false} tickFormatter={(val) => `$${(val / 1000).toFixed(0)}k`} />
+                  {/* 🌟 cursor={false} 關閉背景灰白陰影 */}
                   <Tooltip
-                    cursor={{ fill: 'rgba(255, 255, 255, 0.05)' }}
+                    cursor={false}
                     contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '8px' }}
                     itemStyle={{ color: '#f8fafc', fontWeight: 'bold' }}
                     formatter={(val: any) => [`$${Number(val).toLocaleString()}`, '已實現損益']}
                   />
-                  <Bar dataKey="pnl" radius={[4, 4, 0, 0]} activeBar={renderCustomActiveBar}>
+                  {/* 🌟 activeBar={false} 關閉長條圖 Hover/Click 時的高亮白框與點點 */}
+                  <Bar dataKey="pnl" radius={[4, 4, 0, 0]} activeBar={false}>
                     {realizedPnlData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.pnl >= 0 ? '#ef4444' : '#22c55e'} stroke="none" />
                     ))}
@@ -132,13 +131,15 @@ export default function DashboardCharts({
                 <BarChart data={dividendData} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
                   <XAxis dataKey="year" stroke="#64748b" fontSize={12} tickLine={false} />
                   <YAxis stroke="#64748b" fontSize={12} tickLine={false} tickFormatter={(val) => `$${(val / 1000).toFixed(0)}k`} />
+                  {/* 🌟 cursor={false} 關閉背景灰白陰影 */}
                   <Tooltip
-                    cursor={{ fill: 'rgba(255, 255, 255, 0.05)' }}
+                    cursor={false}
                     contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '8px' }}
                     itemStyle={{ color: '#38bdf8', fontWeight: 'bold' }}
                     formatter={(val: any) => [`$${Number(val).toLocaleString()}`, '年度總配息']}
                   />
-                  <Bar dataKey="dividend" fill="#0284c7" radius={[4, 4, 0, 0]} activeBar={renderCustomActiveBar} />
+                  {/* 🌟 activeBar={false} 關閉長條圖 Hover/Click 時的高亮白框與點點 */}
+                  <Bar dataKey="dividend" fill="#0284c7" radius={[4, 4, 0, 0]} activeBar={false} />
                 </BarChart>
               </ResponsiveContainer>
             )
@@ -153,7 +154,7 @@ export default function DashboardCharts({
           <div className="flex h-full items-center justify-center text-slate-500 text-xs">尚無庫存資料</div>
         ) : (
           <div className="flex flex-1 items-center justify-between gap-4 min-h-0">
-            <div className="w-1/2 h-full">
+            <div className="w-1/2 h-full [&_*]:outline-none">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie data={formattedPieData} dataKey="marketValue" nameKey="symbol" cx="50%" cy="50%" innerRadius={45} outerRadius={75} paddingAngle={3}>
